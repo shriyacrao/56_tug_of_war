@@ -15,7 +15,12 @@ class GameEngine:
         self.last_key = None
         self.winner = None
         self.game_state = "PLAYING"
-
+        
+        # Match timer
+        self.match_duration = 45000
+        self.match_start_time = pygame.time.get_ticks()
+        self.sudden_death = False
+        
         self.computer_pull_cooldown = 180
         self.last_computer_pull = pygame.time.get_ticks()
         
@@ -34,7 +39,9 @@ class GameEngine:
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_a, pygame.K_d):
                 if event.key != self.last_key:
-                    self.rope.pull_left(1.0)
+                    pull_strength = 2.0 if self.sudden_death else 1.0
+
+                    self.rope.pull_left(pull_strength)
                     self.last_key = event.key
 
                     # Start short player pull animation
@@ -49,6 +56,13 @@ class GameEngine:
         # Update rope visuals only
         self.rope.update_visuals()
 
+        # Check match timer
+        if not self.sudden_death:
+            elapsed = now - self.match_start_time
+
+            if elapsed >= self.match_duration:
+                self.sudden_death = True
+
         distance_to_player_goal = self.rope.marker_x - self.rope.left_win_x
 
         if distance_to_player_goal <= 150:
@@ -61,6 +75,10 @@ class GameEngine:
         if now - self.last_computer_pull >= computer_cooldown:
             computer_variance = random.uniform(0.7, 1.2)
             computer_variance *= panic_multiplier
+
+            # Double computer pull during Sudden Death
+            if self.sudden_death:
+                computer_variance *= 2.0
 
             self.rope.pull_right(computer_variance)
             self.last_computer_pull = now
@@ -79,13 +97,41 @@ class GameEngine:
         self.last_key = None
         self.player_pull_until = 0
         self.computer_pull_until = 0
+
         self.winner = None
         self.game_state = "PLAYING"
+
+        self.match_start_time = pygame.time.get_ticks()
+        self.sudden_death = False
+
         self.last_computer_pull = pygame.time.get_ticks()
 
     def render(self, screen):
         screen.fill((30, 32, 36))
+        now = pygame.time.get_ticks()
 
+        if self.sudden_death:
+            timer_text = "SUDDEN DEATH"
+        else:
+            remaining = max(
+                0,
+                (self.match_duration - (now - self.match_start_time) + 999) // 1000
+            )
+            timer_text = f"Time: {remaining}s"
+
+        timer_surf = self.font_small.render(
+            timer_text,
+            True,
+            (240, 240, 240)
+        )
+
+        screen.blit(
+            timer_surf,
+            (
+                self.width // 2 - timer_surf.get_width() // 2,
+                10
+            )
+        )
         mud_rect = pygame.Rect(self.width // 2 - 120, self.height // 2 - 80, 240, 160)
         pygame.draw.rect(screen, (45, 38, 30), mud_rect, border_radius=12)
 
