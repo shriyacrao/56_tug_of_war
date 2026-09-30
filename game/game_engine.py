@@ -42,8 +42,21 @@ class GameEngine:
             return
 
         now = pygame.time.get_ticks()
-        if now - self.last_computer_pull >= self.computer_pull_cooldown:
+
+        # Panic surge when the player is close to winning
+        distance_to_player_goal = self.rope.marker_x - self.rope.left_win_x
+
+        if distance_to_player_goal <= 150:
+            computer_cooldown = 100
+            panic_multiplier = 1.4
+        else:
+            computer_cooldown = self.computer_pull_cooldown
+            panic_multiplier = 1.0
+
+        if now - self.last_computer_pull >= computer_cooldown:
             computer_variance = random.uniform(0.7, 1.2)
+            computer_variance *= panic_multiplier
+
             self.rope.pull_right(computer_variance)
             self.last_computer_pull = now
 
