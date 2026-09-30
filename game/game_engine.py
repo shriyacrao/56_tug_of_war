@@ -18,7 +18,10 @@ class GameEngine:
 
         self.computer_pull_cooldown = 180
         self.last_computer_pull = pygame.time.get_ticks()
-
+        
+        self.player_pull_until = 0
+        self.computer_pull_until = 0
+        
         self.font_big = pygame.font.SysFont(None, 48)
         self.font_small = pygame.font.SysFont(None, 26)
 
@@ -27,15 +30,15 @@ class GameEngine:
             if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
                 self.reset()
             return
-        #BUG SYMPTOM:
-        # Rapidly alternating between 'A' and 'D' causes the rope to suddenly
-        # stop responding. The Computer easily pulls the rope to its side and wins while the player tries hard to pull the rope to its side.
 
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_a, pygame.K_d):
                 if event.key != self.last_key:
                     self.rope.pull_left(1.0)
                     self.last_key = event.key
+
+                    # Start short player pull animation
+                    self.player_pull_until = pygame.time.get_ticks() + 140
         
     def update(self):
         if self.game_state != "PLAYING":
@@ -43,7 +46,9 @@ class GameEngine:
 
         now = pygame.time.get_ticks()
 
-        # Panic surge when the player is close to winning
+        # Update rope visuals only
+        self.rope.update_visuals()
+
         distance_to_player_goal = self.rope.marker_x - self.rope.left_win_x
 
         if distance_to_player_goal <= 150:
@@ -60,14 +65,20 @@ class GameEngine:
             self.rope.pull_right(computer_variance)
             self.last_computer_pull = now
 
+            # Start short computer pull animation
+            self.computer_pull_until = now + 140
+
         result = self.rope.check_winner()
+
         if result:
             self.winner = result
             self.game_state = "GAME_OVER"
-
+            
     def reset(self):
         self.rope.reset()
         self.last_key = None
+        self.player_pull_until = 0
+        self.computer_pull_until = 0
         self.winner = None
         self.game_state = "PLAYING"
         self.last_computer_pull = pygame.time.get_ticks()
@@ -79,8 +90,22 @@ class GameEngine:
         pygame.draw.rect(screen, (45, 38, 30), mud_rect, border_radius=12)
 
         self.rope.render(screen)
-        self.player.render(screen)
-        self.computer.render(screen)
+        now = pygame.time.get_ticks()
+
+        player_pulling = now < self.player_pull_until
+        computer_pulling = now < self.computer_pull_until
+
+        self.player.render(
+            screen,
+            pulling=player_pulling,
+            direction=-1
+        )
+
+        self.computer.render(
+            screen,
+            pulling=computer_pulling,
+            direction=1
+        )
 
         inst_surf = self.font_small.render(
             "Alternate [A] and [D] keys rapidly to pull!", True, (210, 210, 210)
